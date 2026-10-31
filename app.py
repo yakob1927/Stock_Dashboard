@@ -29,7 +29,7 @@ count = st_autorefresh(
 )
 from datetime import datetime
 
-st.success("🚀 1-SECOND STOCK MONITORING ENABLED")
+st.success("🚀 5-SECOND STOCK MONITORING ENABLED")
 
 col1, col2 = st.columns(2)
 
