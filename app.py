@@ -5,84 +5,115 @@ import pandas as pd
 import plotly.graph_objects as go
 from streamlit_autorefresh import st_autorefresh
 
-# --------------------------------
-# PAGE CONFIGURATION
-# --------------------------------
-
-st.set_page_config(
-    page_title="Real-Time Stock Dashboard",
-    page_icon="📈",
-    layout="wide"
-)
-
-# --------------------------------
-# AUTOMATIC REFRESH
-# --------------------------------
-
-st.title("📈 Real-Time Stock Market Dashboard")
-
-st.caption("Live Stock Monitoring and Data Analysis System")
-
-count = st_autorefresh(
-    interval= 5000,
-    key="stock_refresh"
-)
 from datetime import datetime
 
-st.success("🚀 5-SECOND STOCK MONITORING ENABLED")
+# ==========================================
+# PAGE CONFIGURATION
+# ==========================================
 
-col1, col2 = st.columns(2)
-
-col1.metric(
-    "Refresh Count",
-    count
+st.set_page_config(
+    page_title="StockVision | Analytics",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-col2.metric(
-    "Last Dashboard Refresh",
-    datetime.now().strftime("%H:%M:%S")
-)
+# ==========================================
+# CUSTOM PROFESSIONAL CSS
+# ==========================================
 
-st.success("🚀 REAL-TIME MONITORING ENABLED")
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #0b1120;
+        color: #f1f5f9;
+    }
 
-st.write(f"Dashboard refresh count: {count}")
+    [data-testid="stSidebar"] {
+        background-color: #111827;
+    }
 
-# --------------------------------
-# STOCK LIST
-# --------------------------------
+    [data-testid="stMetric"] {
+        background-color: #172338;
+        padding: 18px;
+        border: 1px solid #26364f;
+        border-radius: 12px;
+    }
+
+    [data-testid="stMetricLabel"] {
+        color: #94a3b8;
+    }
+
+    [data-testid="stMetricValue"] {
+        color: #f8fafc;
+    }
+
+    .main-title {
+        font-size: 32px;
+        font-weight: 750;
+        color: #f8fafc;
+    }
+
+    .subtitle {
+        color: #94a3b8;
+        font-size: 14px;
+    }
+
+    .section-title {
+        color: #e2e8f0;
+        font-size: 21px;
+        font-weight: 650;
+    }
+
+    div[data-testid="stTabs"] button {
+        color: #cbd5e1;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# STOCK DATABASE
+# ==========================================
 
 stocks = {
-    "Apple (AAPL)": "AAPL",
-    "Microsoft (MSFT)": "MSFT",
-    "Google (GOOGL)": "GOOGL",
-    "Amazon (AMZN)": "AMZN",
-    "Tesla (TSLA)": "TSLA",
-    "NVIDIA (NVDA)": "NVDA",
-    "Meta (META)": "META",
-    "Netflix (NFLX)": "NFLX",
+    "Apple": "AAPL",
+    "Microsoft": "MSFT",
+    "Google": "GOOGL",
+    "Amazon": "AMZN",
+    "Tesla": "TSLA",
+    "NVIDIA": "NVDA",
+    "Meta": "META",
+    "Netflix": "NFLX",
     "Reliance": "RELIANCE.NS",
     "TCS": "TCS.NS",
     "Infosys": "INFY.NS",
     "HDFC Bank": "HDFCBANK.NS"
 }
 
-# --------------------------------
-# SIDEBAR SETTINGS
-# --------------------------------
+# ==========================================
+# SIDEBAR
+# ==========================================
 
-st.sidebar.header("⚙️ Stock Settings")
+st.sidebar.title("📈 StockVision")
+
+st.sidebar.caption("Professional Market Analytics")
+
+st.sidebar.divider()
+
+st.sidebar.subheader("Market Settings")
 
 selected_stock = st.sidebar.selectbox(
-    "Select Stock",
+    "Choose Stock",
     list(stocks.keys())
 )
 
-period = st.sidebar.selectbox(
-    "Select Period",
-    ["1d", "5d", "1mo", "3mo", "6mo", "1y"]
-)
-
 ticker = stocks[selected_stock]
+
+period = st.sidebar.selectbox(
+    "Analysis Period",
+    ["1d", "5d", "1mo", "3mo", "6mo", "1y"],
+    index=2
+)
 
 intervals = {
     "1d": "1m",
@@ -95,160 +126,236 @@ intervals = {
 
 interval = intervals[period]
 
+refresh_seconds = st.sidebar.selectbox(
+    "Dashboard Refresh",
+    [30, 60, 300],
+    index=1,
+    format_func=lambda x: f"{x} seconds"
+)
+
 currency = "₹" if ticker.endswith(".NS") else "$"
+
+st.sidebar.divider()
 
 st.sidebar.info(
     f"Selected: {ticker}\n\n"
     f"Period: {period}\n\n"
-    f"Interval: {interval}\n\n"
-    "Refresh: 60 seconds"
+    f"Currency: {currency}"
 )
 
-# --------------------------------
+st.sidebar.caption(
+    "Data provider: Yahoo Finance"
+)
+
+# ==========================================
+# AUTOMATIC REFRESH
+# ==========================================
+
+count = st_autorefresh(
+    interval=refresh_seconds * 1000,
+    key="stockvision_refresh"
+)
+
+# ==========================================
+# HEADER
+# ==========================================
+
+col1, col2 = st.columns([3, 1])
+
+with col1:
+    st.markdown(
+        '<div class="main-title">📈 StockVision Analytics</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        '<div class="subtitle">'
+        'Professional Stock Market Monitoring & Analysis'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+with col2:
+    st.metric("Refresh Count", count)
+
+st.divider()
+
+# ==========================================
 # FETCH STOCK DATA
-# --------------------------------
+# ==========================================
 
-try:
+@st.cache_data(ttl=45)
+def fetch_stock_data(symbol, selected_period, selected_interval):
+    stock = yf.Ticker(symbol)
 
-    stock = yf.Ticker(ticker)
-
-    df = stock.history(
-        period=period,
-        interval=interval,
+    data = stock.history(
+        period=selected_period,
+        interval=selected_interval,
         auto_adjust=True
     )
 
+    return data
+
+
+try:
+    with st.spinner("Fetching stock market data..."):
+
+        df = fetch_stock_data(
+            ticker,
+            period,
+            interval
+        )
+
     if df.empty:
+        st.error("No stock data available. Please try another period.")
+        st.stop()
 
-        st.error(
-            "No stock data available. "
-            "Please select another stock or period."
-        )
+    # ======================================
+    # DATA CLEANING
+    # ======================================
 
-    else:
+    required_columns = ["Open", "High", "Low", "Close", "Volume"]
 
-        df = df.dropna(
-            subset=["Close", "Open", "High", "Low"]
-        )
+    df = df.dropna(subset=required_columns).copy()
 
-        if df.empty:
-            st.error("Stock data contains no valid prices.")
-            st.stop()
+    if df.empty:
+        st.error("No valid stock prices found.")
+        st.stop()
 
-        # --------------------------------
-        # TECHNICAL INDICATORS
-        # --------------------------------
+    # ======================================
+    # TECHNICAL INDICATORS
+    # ======================================
 
-        df["SMA20"] = df["Close"].rolling(
-            window=20,
-            min_periods=20
-        ).mean()
+    df["SMA20"] = df["Close"].rolling(
+        window=20,
+        min_periods=20
+    ).mean()
 
-        df["SMA50"] = df["Close"].rolling(
-            window=50,
-            min_periods=50
-        ).mean()
+    df["SMA50"] = df["Close"].rolling(
+        window=50,
+        min_periods=50
+    ).mean()
 
-        # RSI calculation
+    delta = df["Close"].diff()
 
-        delta = df["Close"].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
 
-        gain = delta.clip(lower=0)
+    avg_gain = gain.ewm(
+        alpha=1/14,
+        min_periods=14,
+        adjust=False
+    ).mean()
 
-        loss = -delta.clip(upper=0)
+    avg_loss = loss.ewm(
+        alpha=1/14,
+        min_periods=14,
+        adjust=False
+    ).mean()
 
-        avg_gain = gain.ewm(
-            alpha=1/14,
-            min_periods=14,
-            adjust=False
-        ).mean()
+    rs = avg_gain / avg_loss.replace(0, float("nan"))
 
-        avg_loss = loss.ewm(
-            alpha=1/14,
-            min_periods=14,
-            adjust=False
-        ).mean()
+    df["RSI"] = 100 - (100 / (1 + rs))
 
-        rs = avg_gain / avg_loss.replace(0, float("nan"))
+    # Handle periods with gains but no losses
+    df.loc[
+        (avg_loss == 0) & (avg_gain > 0),
+        "RSI"
+    ] = 100
 
-        df["RSI"] = 100 - (100 / (1 + rs))
+    df.loc[
+        (avg_gain == 0) & (avg_loss > 0),
+        "RSI"
+    ] = 0
 
-        # --------------------------------
-        # PRICE CALCULATIONS
-        # --------------------------------
+    # ======================================
+    # PRICE CALCULATIONS
+    # ======================================
 
-        current_price = float(df["Close"].iloc[-1])
+    current_price = float(df["Close"].iloc[-1])
 
-        previous_price = (
-            float(df["Close"].iloc[-2])
-            if len(df) > 1
-            else current_price
-        )
+    previous_price = (
+        float(df["Close"].iloc[-2])
+        if len(df) > 1
+        else current_price
+    )
 
-        change = current_price - previous_price
+    price_change = current_price - previous_price
 
-        percent_change = (
-            (change / previous_price) * 100
-            if previous_price != 0
-            else 0
-        )
+    percent_change = (
+        price_change / previous_price * 100
+        if previous_price != 0 else 0
+    )
 
-        latest_volume = int(df["Volume"].iloc[-1])
+    day_high = float(df["High"].iloc[-1])
+    day_low = float(df["Low"].iloc[-1])
 
-        # --------------------------------
-        # STOCK INFORMATION
-        # --------------------------------
+    latest_volume = int(df["Volume"].iloc[-1])
 
-        st.header(
-            f"📊 {selected_stock} ({ticker})"
-        )
+    # ======================================
+    # STOCK HEADER
+    # ======================================
 
-        col1, col2, col3, col4 = st.columns(4)
+    st.markdown(
+        f'<div class="section-title">'
+        f'{selected_stock} ({ticker})'
+        f'</div>',
+        unsafe_allow_html=True
+    )
 
-        col1.metric(
-            "Latest Available Price",
-            f"{currency}{current_price:,.2f}"
-        )
+    st.caption(
+        f"Latest available data: "
+        f"{df.index[-1].strftime('%d %b %Y, %H:%M')}"
+    )
 
-        col2.metric(
-            "Price Change",
-            f"{currency}{change:,.2f}",
-            f"{percent_change:.2f}%"
-        )
+    # ======================================
+    # KPI CARDS
+    # ======================================
 
-        col3.metric(
-            "Trading Volume",
-            f"{latest_volume:,}"
-        )
+    st.subheader("Market Overview")
 
-        col4.metric(
-            "Refresh Count",
-            count
-        )
+    c1, c2, c3, c4 = st.columns(4)
 
-        st.caption(
-            f"Latest available data timestamp: "
-            f"{df.index[-1].strftime('%d-%m-%Y %H:%M')}"
-        )
+    c1.metric(
+        "Latest Price",
+        f"{currency}{current_price:,.2f}",
+        f"{percent_change:+.2f}%"
+    )
 
-        st.divider()
+    c2.metric(
+        "Price Change",
+        f"{currency}{price_change:,.2f}"
+    )
 
-        # --------------------------------
-        # STOCK DATA TABLE
-        # --------------------------------
+    c3.metric(
+        "Latest High",
+        f"{currency}{day_high:,.2f}"
+    )
 
-        st.subheader("📋 Stock Market Data")
+    c4.metric(
+        "Trading Volume",
+        f"{latest_volume:,}"
+    )
 
-        st.dataframe(
-            df.sort_index(ascending=False),
-            use_container_width=True
-        )
+    st.divider()
 
-        # --------------------------------
-        # CLOSING PRICE CHART
-        # --------------------------------
+    # ======================================
+    # NAVIGATION TABS
+    # ======================================
 
-        st.subheader("📈 Closing Price Analysis")
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📊 Price Analysis",
+        "🕯️ Candlestick",
+        "📉 Technical Indicators",
+        "📋 Data & Download"
+    ])
+
+    # ======================================
+    # TAB 1: PRICE ANALYSIS
+    # ======================================
+
+    with tab1:
+
+        st.subheader("Stock Price Performance")
 
         fig = go.Figure()
 
@@ -256,8 +363,8 @@ try:
             go.Scatter(
                 x=df.index,
                 y=df["Close"],
-                mode="lines",
-                name="Closing Price"
+                name="Closing Price",
+                line=dict(width=2)
             )
         )
 
@@ -265,8 +372,8 @@ try:
             go.Scatter(
                 x=df.index,
                 y=df["SMA20"],
-                mode="lines",
-                name="SMA 20"
+                name="SMA 20",
+                line=dict(dash="dot")
             )
         )
 
@@ -274,17 +381,22 @@ try:
             go.Scatter(
                 x=df.index,
                 y=df["SMA50"],
-                mode="lines",
-                name="SMA 50"
+                name="SMA 50",
+                line=dict(dash="dash")
             )
         )
 
         fig.update_layout(
-            title="Stock Price with Moving Averages",
+            template="plotly_dark",
+            height=500,
+            hovermode="x unified",
             xaxis_title="Date",
             yaxis_title=f"Price ({currency})",
-            height=500,
-            hovermode="x unified"
+            margin=dict(l=20, r=20, t=40, b=20),
+            legend=dict(
+                orientation="h",
+                y=1.1
+            )
         )
 
         st.plotly_chart(
@@ -292,11 +404,37 @@ try:
             use_container_width=True
         )
 
-        # --------------------------------
-        # CANDLESTICK CHART
-        # --------------------------------
+        st.subheader("Trading Volume")
 
-        st.subheader("🕯️ Candlestick Analysis")
+        volume_fig = go.Figure()
+
+        volume_fig.add_trace(
+            go.Bar(
+                x=df.index,
+                y=df["Volume"],
+                name="Volume"
+            )
+        )
+
+        volume_fig.update_layout(
+            template="plotly_dark",
+            height=350,
+            xaxis_title="Date",
+            yaxis_title="Volume"
+        )
+
+        st.plotly_chart(
+            volume_fig,
+            use_container_width=True
+        )
+
+    # ======================================
+    # TAB 2: CANDLESTICK
+    # ======================================
+
+    with tab2:
+
+        st.subheader("Candlestick Analysis")
 
         candle = go.Figure()
 
@@ -312,10 +450,11 @@ try:
         )
 
         candle.update_layout(
-            title="Open, High, Low and Close Prices",
+            template="plotly_dark",
+            height=600,
             xaxis_title="Date",
             yaxis_title=f"Price ({currency})",
-            height=550
+            xaxis_rangeslider_visible=False
         )
 
         st.plotly_chart(
@@ -323,39 +462,13 @@ try:
             use_container_width=True
         )
 
-        # --------------------------------
-        # VOLUME ANALYSIS
-        # --------------------------------
+    # ======================================
+    # TAB 3: TECHNICAL INDICATORS
+    # ======================================
 
-        st.subheader("📊 Trading Volume Analysis")
+    with tab3:
 
-        volume_fig = go.Figure()
-
-        volume_fig.add_trace(
-            go.Bar(
-                x=df.index,
-                y=df["Volume"],
-                name="Trading Volume"
-            )
-        )
-
-        volume_fig.update_layout(
-            title="Stock Trading Volume",
-            xaxis_title="Date",
-            yaxis_title="Volume",
-            height=400
-        )
-
-        st.plotly_chart(
-            volume_fig,
-            use_container_width=True
-        )
-
-        # --------------------------------
-        # RSI ANALYSIS
-        # --------------------------------
-
-        st.subheader("📉 RSI Indicator")
+        st.subheader("Relative Strength Index")
 
         rsi_fig = go.Figure()
 
@@ -363,8 +476,8 @@ try:
             go.Scatter(
                 x=df.index,
                 y=df["RSI"],
-                mode="lines",
-                name="RSI"
+                name="RSI",
+                line=dict(width=2)
             )
         )
 
@@ -381,10 +494,10 @@ try:
         )
 
         rsi_fig.update_layout(
-            title="Relative Strength Index",
-            yaxis_title="RSI",
+            template="plotly_dark",
+            height=400,
             yaxis_range=[0, 100],
-            height=400
+            yaxis_title="RSI"
         )
 
         st.plotly_chart(
@@ -392,90 +505,119 @@ try:
             use_container_width=True
         )
 
-        # --------------------------------
-        # TECHNICAL ANALYSIS
-        # --------------------------------
+        st.divider()
 
-        st.subheader("📌 Technical Analysis")
+        st.subheader("Technical Analysis Summary")
 
         sma20 = df["SMA20"].iloc[-1]
-
         sma50 = df["SMA50"].iloc[-1]
-
         rsi = df["RSI"].iloc[-1]
 
         col1, col2 = st.columns(2)
 
         with col1:
 
-            st.write("**Moving Average Analysis**")
+            st.markdown("**Moving Average Analysis**")
 
             if pd.notna(sma20) and pd.notna(sma50):
 
                 if sma20 > sma50:
-
                     st.success(
-                        "Bullish trend: SMA20 is above SMA50."
+                        "Bullish moving-average trend"
                     )
 
                 elif sma20 < sma50:
-
                     st.warning(
-                        "Bearish trend: SMA20 is below SMA50."
+                        "Bearish moving-average trend"
                     )
 
                 else:
-
-                    st.info("No clear moving-average trend.")
+                    st.info("No clear moving-average trend")
 
             else:
-
-                st.info("Insufficient data for moving averages.")
+                st.info("Insufficient data for SMA analysis")
 
         with col2:
 
-            st.write("**RSI Analysis**")
+            st.markdown("**RSI Analysis**")
 
             if pd.notna(rsi):
 
                 if rsi > 70:
-
                     st.warning(
-                        "RSI indicates potentially overbought conditions."
+                        f"RSI: {rsi:.2f} - Potentially overbought"
                     )
 
                 elif rsi < 30:
-
                     st.success(
-                        "RSI indicates potentially oversold conditions."
+                        f"RSI: {rsi:.2f} - Potentially oversold"
                     )
 
                 else:
-
                     st.info(
-                        f"RSI is {rsi:.2f}: Neutral range."
+                        f"RSI: {rsi:.2f} - Neutral range"
                     )
 
             else:
+                st.info("Insufficient data for RSI analysis")
 
-                st.info("Insufficient data for RSI.")
+    # ======================================
+    # TAB 4: DATA AND DOWNLOAD
+    # ======================================
 
-        # --------------------------------
-        # FOOTER
-        # --------------------------------
+    with tab4:
 
-        st.divider()
+        st.subheader("Historical Stock Data")
 
-        st.caption(
-            "Stock Market Data Analysis Project | "
-            "Python | Streamlit | Yahoo Finance | Pandas | Plotly"
+        display_columns = [
+            "Open",
+            "High",
+            "Low",
+            "Close",
+            "Volume",
+            "SMA20",
+            "SMA50",
+            "RSI"
+        ]
+
+        st.dataframe(
+            df[display_columns].sort_index(
+                ascending=False
+            ),
+            use_container_width=True
         )
 
-        st.caption(
-            "Data may be delayed. Technical indicators are "
-            "educational tools, not guaranteed trading advice."
+        csv_data = df.to_csv().encode("utf-8")
+
+        st.download_button(
+            label="⬇️ Download Stock Data CSV",
+            data=csv_data,
+            file_name=f"{ticker}_stock_analysis.csv",
+            mime="text/csv"
         )
+
+    # ======================================
+    # FOOTER
+    # ======================================
+
+    st.divider()
+
+    st.caption(
+        "StockVision Analytics | Python | Streamlit | "
+        "Yahoo Finance | Pandas | Plotly"
+    )
+
+    st.caption(
+        "Market data may be delayed or unavailable. "
+        "Technical indicators are educational tools, "
+        "not investment recommendations."
+    )
 
 except Exception as e:
 
-    st.error(f"Error loading stock data: {e}")
+    st.error(f"Unable to load stock data: {e}")
+
+    st.info(
+        "Check your internet connection, selected stock, "
+        "and Yahoo Finance data availability."
+    )
